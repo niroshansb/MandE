@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>IoT Demo</title>
+    <script src="/lib/js/jquery.min.js"></script>
+    <link rel="stylesheet" href="/lib/js/bootstrap.min.css">
+    <script src="/lib/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/lib/js/ol.css" type="text/css">
+    <script src="/lib/js/ol.js"></script>
+  </head>
+  <style>
+    *{
+      border: 0px;
+      margin: 0px;
+    }
+    .popover{
+      width: 860px;
+      height: auto;    
+    }
+    .map{
+      position: absolute;
+      right: 0.5 vw;
+      width: 99.5%;
+      height: 90vh;
+      z-index: 1;
+    }
+    .ol-mouse-position {
+      position: absolute;
+      right: 40px;
+      background: rgba(0,60,136,.5);
+      background-clip: padding-box;
+      border-radius: 4px;
+      border: 3px solid rgba(255,255,255,.4);
+      padding: 2px;
+      color: rgb(255,255,255);
+      font-size: 12px;
+      text-align: center;
+    }	  
+    .ol-overviewmap {
+      position: absolute;
+      left: 8px;
+      bottom: 40px;
+    }
+    .ol-attribution ul {
+      font-size: 80%;
+    }
+    #container { 
+      padding:5px 1px 8px 1px; 
+    }
+    .v-center {
+      display:table;   
+      height:75px;
+      /*border-style: solid;
+      border-width: 1px;*/
+    }
+    .content {
+      display:table-cell;
+      vertical-align:middle;
+      margin:auto;
+    }
+    @media (min-width: 992px) {
+      .right_align_large_medium {
+        text-align: right;
+      }
+
+	#locationinfo{
+	position: absolute;
+	top: 1em;
+	left: 2.5em;
+	}
+	
+    .mylocation{
+	border: 1px solid blue;
+	background-color:#877d57;
+	}
+
+    }
+  </style>
+  <body>
+<div class="mylocation" id="locationinfo">
+        <select class="myLocationSelect" onchange="doBounce(myLocations[$(this).val()]);changeLayer();">
+        </select>
+
+	</div>
+
+    <div class="container-fluid">
+      <div class="row-fluid">
+        <div class="span12">
+
+	  <div class="row">
+            <div class="col-xs-12 col-sm-7 col-md-5 col-lg-4 text-left v-center">
+               <h2 class="content"><b>IoT Demo - Humidity and Temperature</b></h2>
+           
+            </div>
+            <div class="col-xs-12 col-sm-12 col-md-7 col-lg-8 right_align_large_medium v-center"> 
+                    </div>
+           </div>
+          
+	 
+	  <div style="position: relative;">
+            <div id="map" class="map">
+              <div id="popup"></div>                
+	    </div>
+	  </div> 
+	
+        </div>
+      </div>
+    </div>
+    
+    <script>
+
+      var osm = new ol.layer.Tile({
+        //type: 'base',
+	//visible: true,
+        source: new ol.source.OSM()
+      });
+
+	/*
+
+	// test WMS
+	var test = new ol.layer.Tile({
+    		source: new ol.source.TileWMS({
+        	url: 'localhost,
+        	params: {
+            		'LAYERS': 'cost:Bimari',
+            		'VERSION': '1.1.1',
+            		'FORMAT': 'image/png',
+            		'TILED': true
+        	}
+    	})
+	});
+http://8080/geoserver/cite/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=cite:weatherinfo&maxFeatures=50&outputFormat=SHAPE-ZIP
+	*/
+
+      //format used to parse WFS GetFeature responses
+      var geojsonFormat = new ol.format.GeoJSON();
+
+      var vectorSource = new ol.source.Vector({
+        loader: function(extent, resolution, projection) {
+          var url = 'http://localhost:8080/geoserver/sf/ows?service=WFS&' +
+            'version=1.1.0&request=GetFeature&typename=sf:iot_demo&' +
+            'outputFormat=text/javascript&format_options=callback:loadFeatures' +
+            '&srsname=EPSG:3857&bbox=' + extent.join(',') + ',EPSG:3857';
+          $.ajax({url: url, dataType: 'jsonp', jsonp: false});
+        },
+        strategy: ol.loadingstrategy.tile(ol.tilegrid.createXYZ({
+          maxZoom: 19
+        }))
+      });
+
+      /**
+       * JSONP WFS callback function.
+       * @param {Object} response The response object.
+       */
+      window.loadFeatures = function(response) {
+        vectorSource.addFeatures(geojsonFormat.readFeatures(response));
+      };
+
+      var vector = new ol.layer.Vector({
+        source: vectorSource,
+        style: new ol.style.Style({
+            image: new ol.style.Icon(({
+            	anchor: [13, 35],
+            	anchorXUnits: 'pixels',
+            	anchorYUnits: 'pixels',
+            	src: 'http://localhost/lib/img/marker.png'
+            }))
+        })
+
+      });
+
+      var map = new ol.Map({
+        layers: [osm, vector],
+        target: document.getElementById('map'),
+        controls: ol.control.defaults().extend([
+          new ol.control.ScaleLine(), 
+	  new ol.control.FullScreen(),
+	  new ol.control.OverviewMap(),
+	  new ol.control.MousePosition({
+            coordinateFormat: ol.coordinate.createStringXY(4),
+            projection: 'EPSG:4326'})
+	]),
+        view: new ol.View({
+          center:[15084375.2072,4108571.12203],// [8221686.52502,2098536.9975],//[15084375.2072,4108571.12203], //[8533289, 1380445]
+          zoom: 12 
+        })
+      });
+
+
+var myLocations={"Osaka":
+	 ol.proj.transform([135.504867,34.592196],'EPSG:4326','EPSG:3857'),"Pune":
+	 ol.proj.transform([73.8567,18.5204],'EPSG:4326','EPSG:3857'),"Colombo":
+	ol.proj.transform([79.8612,6.9271],'EPSG:4326','EPSG:3857'),"Bangkok":
+         ol.proj.transform([100.56553,13.732249],'EPSG:4326','EPSG:3857')};
+
+        for(i in myLocations)
+         $(".myLocationSelect").append('<option value="'+i+'">'+i+'</option>');
+
+
+        function doBounce(location) {
+        // bounce by zooming out one level and back in
+        var bounce = ol.animation.bounce({
+          resolution: map.getView().getResolution() * 2
+        });
+        // start the pan at the current center of the map
+        var pan = ol.animation.pan({
+          source: map.getView().getCenter()
+        });
+        map.beforeRender(bounce);
+        map.beforeRender(pan);
+        // when we set the center to the new location, the animated move will
+        // trigger the bounce and pan effects
+        map.getView().setCenter(location);
+      }
+      function doPan(location) {
+        // pan from the current center
+        var pan = ol.animation.pan({
+          source: map.getView().getCenter()
+        });
+        map.beforeRender(pan);
+        // when we set the new location, the map will pan smoothly to it
+        map.getView().setCenter(location);
+      }
+
+
+
+
+      var element = document.getElementById('popup');
+
+      var popup = new ol.Overlay({
+        element: element,
+        positioning: 'bottom-center',
+        stopEvent: false
+      });
+      map.addOverlay(popup);
+
+      //display popup on click
+      map.on('click', function(evt) {
+        var feature = map.forEachFeatureAtPixel(evt.pixel,
+          function(feature, layer) {
+          return feature;
+        });
+
+        if (feature) {
+          var geometry = feature.getGeometry();
+          var coord = geometry.getCoordinates();
+          popup.setPosition(coord);
+
+          $(element).attr('data-placement', 'top');
+          $(element).attr('data-html', true);
+          $(element).attr('data-content', "<div id=container> <b>Weather info: </b>" + "Humid & Temperature" + "<br>" +
+			  "<b>Humidity: </b>" + feature.get("humid") + "%"+"<br>" + 
+			  "<b>Temperature: </b>" + feature.get("tempe") +"C"+ "<br>"+
+			"<b>Time:</b>" + feature.get("timestamp") + "<br>" );
+          $(element).popover('show');
+        } 
+        else {
+          $(element).popover('destroy');
+        }
+      });
+
+      //change mouse cursor when over marker
+      map.on('pointermove', function(e) {
+        if (e.dragging) {
+          $(element).popover('destroy');
+          return;
+        }
+        var pixel = map.getEventPixel(e.originalEvent);
+        var hit = map.hasFeatureAtPixel(pixel);
+        map.getTarget().style.cursor = hit ? 'pointer' : '';
+     });
+	$('#locationinfo').appendTo(
+	$('.ol-overlaycontainer'));
+
+    </script>
+  </body>
+</html>
+
